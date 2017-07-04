@@ -26,9 +26,9 @@ using namespace std;
 double TARGET = 1;
 int iterations = 1;
 int NUM, MOTIF, NUM_b;
-double FILTER;
-double alpha = 0.5;
-//int num_f, num_b; // used to store num of seq in forground and background
+double FILTER = 0.05;
+double alpha = 0.5;  //weight of foreground vs. background, the default is equally weighted
+double tenure = 0.5; //default tabu list length = 0.5 * MOTIF
 
 
 struct logger : public mets::search_listener<full_neighborhood>
@@ -132,10 +132,10 @@ void tabuSearch(vector<motif> set_m, vector<motif> set_b, double& best_solution,
     my_sol best(model);
     full_neighborhood neigh(model.size());
     logger g(out);
-    mets::simple_tabu_list tabu_list(MOTIF/5);
+    mets::simple_tabu_list tabu_list(MOTIF * tenure);
     mets::best_ever_criteria aspiration_criteria;
     mets::noimprove_termination_criteria noimprove(1000);
-    mets::threshold_termination_criteria threshold_noimprove(&noimprove, 0);
+    mets::threshold_termination_criteria threshold_noimprove(&noimprove, 0.0);
     mets::best_ever_solution best_recorder(best);
     
     mets::tabu_search<full_neighborhood> algorithm(model,
@@ -161,6 +161,25 @@ void tabuSearch(vector<motif> set_m, vector<motif> set_b, double& best_solution,
     
 }
 
+vector<string> split(string line, string delimiter) {
+    vector<string> list;
+    string s = line;
+    size_t pos = 0;
+    string token;
+    while((pos = s.find(delimiter)) != string::npos) {
+        //cout << "pos = " << pos << "\n";
+        token = s.substr(0, pos);
+        //cout << token << "--";
+        token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+        if (token != "") 
+            
+            list.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+    list.push_back(s);
+    return list;
+}
+
 int main (int argc, char* argv[]) {
     
     vector<pair<string,motif> > mymotif;
@@ -172,107 +191,95 @@ int main (int argc, char* argv[]) {
     vector<pair<string,motif> > selected_motifs;
     vector<pair<string,motif> > selected_motifs_b;
     
-    if (argc < 4) {
+    if (argc < 3) {
         cout<<"no input or output file"<<endl;
         exit(1);
     }
-    if (argc < 5) {
-        cout<<"no FILTER threshold, enter 0.05, 0.02, or 0.03, or -1 for no filtering"<<endl;
-        exit(1);
+    if (argc < 4) {
+        cout<<"Use default setting: FILTER threshold = 0.05, alpha = 0.5, tenure = 0.5 and iteration = 1"<<endl;
     }
-    FILTER = atof(argv[4]);
-    if (argc >5)
-        iterations = atoi(argv[5]);
-    ifstream in;   //foreground matrix
-    ifstream in2;  //background matrix
+    else
+        FILTER = atof(argv[3]);
+    if (argc > 4)
+        tenure = atof(argv[4]);
+    if (argc > 5)
+        alpha = atof(argv[5]);
+    if (argc > 6)
+        iterations = atoi(argv[6]);
+    ifstream in;   //input matrix
     ofstream out;
-    ofstream outfile("motifcoverage.csv", ios::app);
-    //string filename = argv[3];
-    //filename.append("motifcov.csv");
-    // ofstream outfile(filename.c_str());
+    //ofstream outfile("motifcoverage.csv", ios::app);
+    ofstream log("log.txt");
     in.open(argv[1]);
-    in2.open(argv[2]);
-    out.open(argv[3]);
+    out.open(argv[2]);
     std::string line;
     std::string line2;
     vector<motif> set_m;
     vector<motif> set_b;
-    int row = 0;
     vector<motif> ori_motif;
     vector<string> ori_name;
-    //input for foreground matrix
-    if (in.is_open()){
+    vector<string> seq_name;
+    if (in.is_open()) {
         string mot_name;
-        while (in >> mot_name) {
-            ori_name.push_back(mot_name);
-            getline(in, line);
-            row++;
-            std::istringstream iss(line);
-            NUM = line.length()/2;
-            int n;
-            while (iss >> n)
-            {
-                motif s(NUM);
-                for (int j = 0; j < NUM; j++) {
-                    s.mot[j] = n;
-                    iss >> n;
+        vector<string> seq;
+        string seq_type;
+        string s;
+        getline(in, line);
+        ori_name = split(line, ",");
+        ori_name.pop_back();
+        MOTIF = ori_name.size();
+        //cout << MOTIF << "\n";
+        vector< vector<int>> matrix_f(MOTIF);
+        vector< vector<int>> matrix_b(MOTIF);
+        while (in >> s) {
+            seq = split(s, ",");
+            seq_name.push_back(seq.front());
+            seq_type = seq.back();
+            //cout << s << "\n" << seq_type << "\n" << seq.size() << "\n";
+            if (seq_type.compare("1") == 0) {
+                for (int j = 1; j <= MOTIF; j++) {
+                    //cout << stoi(seq[j]) << "\n";
+                    matrix_f[j-1].push_back(stoi(seq[j]));
                 }
-                
-                ori_motif.push_back(s);
+            }
+            else if (seq_type.compare("-1") == 0) {
+                for (int j = 1; j <= MOTIF; j++) {
+                    matrix_b[j-1].push_back(stoi(seq[j]));
+                }
+            }
+            else {
+                cout << "Error: Wrong type! " << seq_type << "\n";
             }
         }
-        
-        MOTIF = row;
+        NUM = matrix_f[0].size();
+        NUM_b = matrix_b[0].size();
+            
+        for (int i = 0; i < MOTIF; i++) {
+            motif m_fore(matrix_f[i]);
+            motif m_back(matrix_b[i]);
+            ori_motif.push_back(m_fore);
+            mot_name = ori_name[i];
+            tmp_motif.push_back(make_pair(mot_name, m_back));
+        }
         in.close();
-        
     }
-    else
+     else
         cout<<"Foreground Input file cannot open\n";
     
-    //input for background matrix
-    if (in2.is_open()){
-        string mot_name;
-        while (in2 >> mot_name) {
-            getline(in2, line2);
-            row++;
-            std::istringstream iss(line2);
-            NUM_b = line2.length()/2;
-            int n;
-            while (iss >> n)
-            {
-                motif s(NUM_b);
-                for (int j = 0; j < NUM_b; j++) {
-                    s.mot[j] = n;
-                    iss >> n;
-                }
-                tmp_motif.push_back(make_pair(mot_name,s));
-            }
-            
-        }
-        in2.close();
-    }
-    else
-        cout<<"Background Input file cannot open\n";
-    
-   
-        
-    /* print each motif info to outfile */
-    printMotifs(outfile, mymotif, mymotif_b);
-    
     /* output file */
-    out<<"NUM of motif: "<< MOTIF << "Num of foreground seq :"<< NUM << "Num of background seq : "
+    cout<<"NUM of motif: "<< MOTIF << "Num of foreground seq :"<< NUM << "Num of background seq : "
     << NUM_b << endl;
     
-    out <<"=====================================================\n";
+    cout <<"=====================================================\n";
     best_solution = 2*MOTIF;  //initialize cost to max
     //iterations = MOTIF; //set the iteration to num of motifs
     for (int k = 0; k < iterations; k++) {
-       // cout << "iter " << k << endl;
         /*randomize the order of motifs */
         randomizeData(ori_motif, ori_name, mymotif, tmp_motif, mymotif_b, set_m, set_b);
-
+        /* print each motif info to outfile */
+        //printMotifs(outfile, mymotif, mymotif_b);
         /*tabu search*/
-        tabuSearch(set_m, set_b, best_solution, selected_motifs, selected_motifs_b ,mymotif, mymotif_b,out);
+        tabuSearch(set_m, set_b, best_solution, selected_motifs, selected_motifs_b ,mymotif, mymotif_b, log);
         cout << "Objective function: " << best_solution << endl;
     }
     
@@ -286,17 +293,17 @@ int main (int argc, char* argv[]) {
     vector<pair<string,motif> >::iterator it = selected_motifs.begin();
     vector<pair<string,motif> >::iterator it_b = selected_motifs_b.begin();
     for (int i = 0; i < selected_motifs.size(); i++) {
-        
-        out << it->first << endl << "Foreground Covered sequences: " << (it->second).coverage() << endl
+        out << it->first << endl;
+        cout << it->first << endl << "Foreground Covered sequences: " << (it->second).coverage() << endl
         << "Background covered sequences: " << (it_b->second).coverage() << endl << "==========" << endl;
         selected_b.add(it_b->second);
             selected_f.add(it->second);
         it++;
         it_b++;
         }
-        out << "Best solution: " << best_solution << endl;
-        out << "Num of features: " << selected_motifs.size() << endl;
-        out << "Total foreground coverage: " << selected_f.coverage() / NUM << endl
+        cout << "Best solution: " << best_solution << endl;
+        cout << "Num of features: " << selected_motifs.size() << endl;
+        cout << "Total foreground coverage: " << selected_f.coverage() / NUM << endl
             << "Total background coverage: " << selected_b.coverage() / NUM_b << endl;
  
     return 0;

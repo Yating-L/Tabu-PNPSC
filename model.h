@@ -70,11 +70,19 @@ public:
         }
         
     }
+    
+    motif(vector<int>& m) {
+        seq = m.size();
+        mot = new int[seq];
+        for (int i = 0; i < seq; i++) {
+            mot[i] = m[i];
+        }
+    }
 };
 
 
 
-class my_sol : public mets::evaluable_solution,public motif
+class my_sol : public mets::evaluable_solution, public motif
 {
     
 public:
@@ -93,7 +101,7 @@ public:
     current_sum_m(MOTIF)
     { }
     
-    bool accept (const feasible_solution& sol);
+   // bool accept(const feasible_solution& sol);
     double value(my_sol sol) const;
     double total_fore_coverage() const;
     double total_back_coverage() const;
@@ -104,7 +112,7 @@ public:
     mets::gol_type what_if(int i, bool val) const;
     bool delta(int i) const;
     void delta(int i, bool val);
-    motif element_fore(int i) const;
+    //motif element_fore(int i) const;
     
     friend ostream& operator<<(ostream& o, const motif& Motif);
     friend vector<pair<string,motif> > output_sol (const my_sol& s, vector<pair<string,motif> > mymotif);

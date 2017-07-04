@@ -9,24 +9,28 @@
 #include <stdio.h>
 #include "model.h"
 
-
+/*
 bool my_sol::accept (const feasible_solution& sol)
 {
-    if (total_fore_coverage() < 1.0)
+    if (cost_function() > 0)
         return false;
     else
         return true;
+
 }
+*/
 
 double my_sol::value(my_sol sol) const //calculate optimize function value, goal: minimizing the value
 {
-    motif motif_set(NUM);
+    /* 
+motif motif_set(NUM);
     
     for(int j = 0; j < MOTIF; ++j) {
         if (delta_m[j]) {
             motif_set.add(sol.set[j]);
         }
     }
+ */
     
     return sol.set_size() + MOTIF * (alpha * (1 - sol.total_fore_coverage()) + (1 - alpha) * sol.total_back_coverage());
     // return (sol.set_size() / TOTAL_SEQ / (coverage + 1));
@@ -138,7 +142,7 @@ mets::gol_type my_sol::what_if(int i, bool val) const
         
     }
     
-    if (newcover - oricover > 0 && newcover - oricover < FILTER && val)
+    if (newcover - oricover < FILTER && val)
         return 10000 * diff;
     else
         return diff;
@@ -150,16 +154,16 @@ void my_sol::delta(int i, bool val)
 {
     if (delta_m[i] && !val) {
         delta_m[i] = val;
-        current_sum_m = set_size() + MOTIF * (1 - total_fore_coverage()) ;
+        current_sum_m = set_size() + MOTIF * (alpha * (1 - total_fore_coverage()) + (1 - alpha) * total_back_coverage());
     }
     else if (!delta_m[i] && val) {
         delta_m[i] = val;
-        current_sum_m = set_size() + MOTIF * (1 - total_fore_coverage());
+        current_sum_m = set_size() + MOTIF * (alpha * (1 - total_fore_coverage()) + (1 - alpha) * total_back_coverage());
     }
     
 }
 
-motif my_sol::element_fore(int i) const { return set[i]; }
+//motif my_sol::element_fore(int i) const { return set[i]; }
 
 
 ostream& operator<<(ostream& o, const motif& Motif) {
