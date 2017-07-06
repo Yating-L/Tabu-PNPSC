@@ -152,7 +152,7 @@ bool my_sol::delta(int i) const { return delta_m[i];}
 
 void my_sol::delta(int i, bool val)
 {
-    if (delta_m[i] && !val) {
+    if (delta_m[i] && !val && set_size() > 1) {
         delta_m[i] = val;
         current_sum_m = set_size() + MOTIF * (alpha * (1 - total_fore_coverage()) + (1 - alpha) * total_back_coverage());
     }
